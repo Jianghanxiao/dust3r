@@ -2,10 +2,10 @@ import open3d as o3d
 import numpy as np
 import json
 import cv2
-from time import sleep
+import pickle
 
-data_path = "/home/hanxiao/Desktop/Research/proj-qqtt/proj-QQTT/data/reform_SG/burger"
-
+base_path = "/home/hanxiao/Desktop/Research/proj-qqtt/proj-QQTT/data/real_collect"
+case_name = "rope_double_hand"
 
 # Currently this doesn't consider different fx and fy
 def getCamera(
@@ -73,37 +73,20 @@ def getCamera(
 
 
 if __name__ == "__main__":
-    # Load the images and the camera parameters
-    # Load the camera parameters
-    with open(f"{data_path}/camera_info.json", "r") as f:
-        camera_info = json.load(f)
-
-    intrinsic = np.array(camera_info["intrinsic"])
-    c2ws = camera_info["c2ws"]
-    cameras = list(c2ws.keys())
-
     vis = o3d.visualization.Visualizer()
-    vis.create_window(visible=True)
+    vis.create_window()
 
-    object_masks = []
-    for camera in cameras:
-        object_mask = cv2.imread(
-            f"{data_path}/masks/{camera}/0.png", cv2.IMREAD_GRAYSCALE
-        )
-        object_masks.append(object_mask)
-    object_masks = np.stack(object_masks, axis=0)
     data = np.load(f"results/points_colors_0.npz")
     pts3d = data["pts3d"]
     imgs = data["imgs"]
     confidence_masks = data["confidence_masks"]
-    final_masks = np.logical_and(confidence_masks, object_masks)
-    points = pts3d[final_masks]
-    colors = imgs[final_masks]
+    points = pts3d[confidence_masks]
+    colors = imgs[confidence_masks]
 
     focals = data["focals"]
     c2ws = data["poses"]
     pp = data["pp"]
-
+    
     camera_visuals = []
     for i in range(len(c2ws)):
         camera_visual = getCamera(
@@ -112,7 +95,7 @@ if __name__ == "__main__":
             focals[i][0],
             pp[i][0],
             pp[i][1],
-            scale=0.5,
+            scale=0.2,
             z_flip=True,
         )
         camera_visuals += camera_visual
@@ -127,6 +110,7 @@ if __name__ == "__main__":
 
     vis.add_geometry(pcd)
     vis.add_geometry(coordinate)
+
     for camera_visual in camera_visuals:
         vis.add_geometry(camera_visual)
 
@@ -135,21 +119,13 @@ if __name__ == "__main__":
     view_control.set_up([0, 0, -1])
     # view_control.set_zoom(3)
 
-    for index in range(1, 20):
-        object_masks = []
-        for camera in cameras:
-            object_mask = cv2.imread(
-                f"{data_path}/masks/{camera}/{index}.png", cv2.IMREAD_GRAYSCALE
-            )
-            object_masks.append(object_mask)
-        object_masks = np.stack(object_masks, axis=0)
+    for index in range(1, 365):
         data = np.load(f"results/points_colors_{index}.npz")
         pts3d = data["pts3d"]
         imgs = data["imgs"]
         confidence_masks = data["confidence_masks"]
-        final_masks = np.logical_and(confidence_masks, object_masks)
-        points = pts3d[final_masks]
-        colors = imgs[final_masks]
+        points = pts3d[confidence_masks]
+        colors = imgs[confidence_masks]
 
         focals = data["focals"]
         c2ws = data["poses"]
@@ -160,4 +136,3 @@ if __name__ == "__main__":
         vis.update_geometry(pcd)
         vis.poll_events()
         vis.update_renderer()
-        sleep(0.2)
